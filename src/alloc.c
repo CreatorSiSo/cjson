@@ -2,20 +2,28 @@
 
 #include <assert.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <valgrind.h>
 
 #define PAGE_SIZE (sysconf(_SC_PAGE_SIZE))
 
 struct Region {
-    Region* next;
+    struct Region* next;
     uint8_t* bytes;
     size_t remaining;
 };
 
-Region* Region_init(void) {
-    void* page = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE,
-                      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+Region* Region_new(void) {
+    void* page = mmap(
+        nullptr,
+        PAGE_SIZE,
+        PROT_READ | PROT_WRITE,
+        MAP_ANONYMOUS | MAP_PRIVATE,
+        -1,
+        0);
+    VALGRIND_MALLOCLIKE_BLOCK(page, PAGE_SIZE, 0, 0);
     assert(page != MAP_FAILED);
 
     Region* region = (Region*)page;
@@ -44,26 +52,40 @@ uint8_t* Region_try_alloc(Region* region, size_t size) {
 void Region_destroy(Region* region) {
     assert(region != nullptr);
 
+    VALGRIND_FREELIKE_BLOCK(region, 0);
     int result = munmap((void*)region, PAGE_SIZE);
     assert(result == 0);
 }
 
-struct Arena {
-    Region* head;
-    Region* tail;
-};
+void Region_debug_print(Region* region) {
+    assert(region != nullptr);
 
-Arena Arena_init(void) {
+    fprintf(
+        stderr,
+        "Region(%p) {\n"
+        "  .next = %p,\n"
+        "  .bytes = %p,\n"
+        "  .remaining = %zu,\n"
+        "}\n",
+        (void*)region,
+        (void*)region->next,
+        region->bytes,
+        region->remaining);
+}
+
+Arena Arena_new(void) {
     Arena arena;
-    arena.head = Region_init();
+    arena.head = Region_new();
     arena.tail = arena.head;
+    arena.regions = 1;
     return arena;
 }
 
 Region* Arena_new_region(Arena* arena) {
-    Region* region = Region_init();
+    Region* region = Region_new();
     arena->tail->next = region;
     arena->tail = region;
+    arena->regions += 1;
     return region;
 }
 
@@ -90,6 +112,20 @@ void Arena_destroy(Arena* arena) {
     while (current != nullptr) {
         next = current->next;
         Region_destroy(current);
+        current = next;
+    }
+    arena->head = nullptr;
+    arena->tail = nullptr;
+}
+
+void Arena_debug_print(Arena* arena) {
+    assert(arena != nullptr);
+
+    Region* current = arena->head;
+    Region* next;
+    while (current != nullptr) {
+        next = current->next;
+        Region_debug_print(current);
         current = next;
     }
 }

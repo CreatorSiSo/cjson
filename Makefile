@@ -1,4 +1,4 @@
-cflags := -Wall -Wextra -Wpedantic -std=c23
+cflags := -Wall -Wextra -Wpedantic -std=c23 -I/usr/include/valgrind
 lib_headers := src/cjson.h src/alloc.h
 lib_sources := src/cjson.c src/alloc.c
 lib_objects := $(patsubst src/%.c, build/%.o, $(lib_sources))

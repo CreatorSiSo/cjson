@@ -41,25 +41,25 @@ struct Json {
     JsonData data;
 };
 
-Json Json_array(JsonArray value) {
+static inline Json Json_array(JsonArray value) {
     return (Json){.kind = JSON_ARRAY, .data = {.array = value}};
 }
 
-Json Json_string(BytesSlice value) {
+static inline Json Json_string(BytesSlice value) {
     return (Json){.kind = JSON_STRING,
                   .data = {.string = Bytes_from_slice(value)}};
 }
 
-Json Json_number(double value) {
+static inline Json Json_number(double value) {
     return (Json){.kind = JSON_NUMBER, .data = {.number = value}};
 }
 
-Json Json_bool(bool value) {
+static inline Json Json_bool(bool value) {
     return (Json){.kind = value ? JSON_TRUE : JSON_FALSE,
                   .data = {.none = nullptr}};
 }
 
-Json Json_null() {
+static inline Json Json_null() {
     return (Json){.kind = JSON_NULL, .data = {.none = nullptr}};
 }
 

@@ -4,11 +4,18 @@
 #include <stdint.h>
 
 typedef struct Region Region;
-typedef struct Arena Arena;
 
-Arena Arena_init(void);
+typedef struct Arena {
+    Region* head;
+    Region* tail;
+    size_t regions;
+    // TODO Thread safety
+} Arena;
+
+Arena Arena_new(void);
 uint8_t* Arena_alloc(Arena* arena, size_t bytes);
 void Arena_destroy(Arena* arena);
+void Arena_debug_print(Arena* arena);
 
 typedef struct {
     uint8_t* start;
