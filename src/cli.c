@@ -14,8 +14,8 @@ int main(int argc, char* argv[]) {
     puts("\n");
 
     Arena arena = Arena_new();
-    while (arena.regions < 16) {
-        Arena_alloc(&arena, 8);
+    for (size_t i = 0; arena.regions < (2l << 19); i += 1) {
+        Arena_alloc(&arena, i % 4096);
     }
     Arena_debug_print(&arena);
 
