@@ -1,6 +1,8 @@
 # CJson
 
-A tiny library
+A tiny library and cli for parsing and filtering json data.
+
+...that is written in C, duh
 
 ## Build and Run
 
