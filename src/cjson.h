@@ -8,7 +8,7 @@
 typedef struct Json Json;
 
 typedef struct {
-    BytesSlice* keys;
+    ByteSlice* keys;
     Json* values;
     size_t length;
 } JsonObject;
@@ -32,7 +32,7 @@ typedef union {
     JsonObject object;
     JsonArray array;
     double number;
-    Bytes string;
+    AnyBuffer string;
     nullptr_t none;
 } JsonData;
 
@@ -45,9 +45,8 @@ static inline Json Json_array(JsonArray value) {
     return (Json){.kind = JSON_ARRAY, .data = {.array = value}};
 }
 
-static inline Json Json_string(BytesSlice value) {
-    return (Json){.kind = JSON_STRING,
-                  .data = {.string = Bytes_from_slice(value)}};
+static inline Json Json_string(AnyBuffer value) {
+    return (Json){.kind = JSON_STRING, .data = {.string = value}};
 }
 
 static inline Json Json_number(double value) {
@@ -63,6 +62,6 @@ static inline Json Json_null() {
     return (Json){.kind = JSON_NULL, .data = {.none = nullptr}};
 }
 
-Bytes Json_to_string(bool pretty);
+ByteBuffer Json_to_string(Json* value, bool pretty);
 
-Json Json_parse(BytesSlice input);
+Json Json_parse(ByteSlice input, Arena* arena);

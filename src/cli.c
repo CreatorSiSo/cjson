@@ -1,6 +1,9 @@
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <unistd.h>
 
+#include "alloc.h"
 #include "cjson.h"
 
 int main(int argc, char* argv[]) {
@@ -11,14 +14,32 @@ int main(int argc, char* argv[]) {
         }
         printf("%s", argv[argi]);
     }
-    puts("\n");
+    puts("");
 
     Arena arena = Arena_new();
-    for (size_t i = 0; arena.regions < (2l << 19); i += 1) {
-        Arena_alloc(&arena, i % 4096);
-    }
-    Arena_debug_print(&arena);
 
-    Arena_destroy(&arena);
+    constexpr size_t CHUNK_SIZE = 64;
+    ByteBuffer input = Buffer_new();
+    while (true) {
+        Buffer_grow((AnyBuffer*)&input, &arena, CHUNK_SIZE);
+
+        const size_t bytes_read =
+            fread(input.data + input.length, 1, CHUNK_SIZE, stdin);
+        if (ferror(stdin)) return -1;
+
+        input.length += bytes_read;
+        if (feof(stdin)) break;
+    }
+
+    printf("Input (%zu bytes):\n", input.length);
+    fwrite(input.data, 1, input.length, stdout);
+    puts("");
+
+    Json value = Json_parse(ByteSlice_new(input.data, input.length), &arena);
+
+    ByteBuffer pretty_printed = Json_to_string(&value, true);
+    fwrite(pretty_printed.data, 1, pretty_printed.length, stdout);
+
     Arena_debug_print(&arena);
+    Arena_destroy(&arena);
 }

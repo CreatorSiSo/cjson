@@ -1,8 +1,10 @@
 #include "alloc.h"
 
 #include <assert.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <valgrind.h>
@@ -15,22 +17,22 @@ struct Region {
     size_t remaining;
 };
 
-Region* Region_new(void) {
+Region* Region_new(size_t size) {
     void* page = mmap(
         nullptr,
-        PAGE_SIZE,
+        size,
         PROT_READ | PROT_WRITE,
         MAP_ANONYMOUS | MAP_PRIVATE,
         -1,
         0);
-    VALGRIND_MALLOCLIKE_BLOCK(page, PAGE_SIZE, 0, 0);
+    VALGRIND_MALLOCLIKE_BLOCK(page, size, 0, 0);
     assert(page != MAP_FAILED);
 
     Region* region = (Region*)page;
     *region = (Region){
         .next = nullptr,
         .bytes = (uint8_t*)page + sizeof(Region),
-        .remaining = PAGE_SIZE - sizeof(Region),
+        .remaining = size - sizeof(Region),
     };
 
     return region;
@@ -75,14 +77,14 @@ void Region_debug_print(Region* region) {
 
 Arena Arena_new(void) {
     Arena arena;
-    arena.head = Region_new();
+    arena.head = Region_new(PAGE_SIZE);
     arena.tail = arena.head;
     arena.regions = 1;
     return arena;
 }
 
-Region* Arena_new_region(Arena* arena) {
-    Region* region = Region_new();
+Region* Arena_new_region(Arena* arena, size_t size) {
+    Region* region = Region_new(size);
     arena->tail->next = region;
     arena->tail = region;
     arena->regions += 1;
@@ -101,8 +103,10 @@ uint8_t* Arena_alloc(Arena* arena, size_t size) {
         current = next;
     }
 
-    // Did not find a large enough slot in the already allocted regions
-    Region* tail = Arena_new_region(arena);
+    // Did not find a large enough slot in the already allocated regions
+    size_t region_size =
+        size < (size_t)PAGE_SIZE ? (size_t)PAGE_SIZE : sizeof(Region) + size;
+    Region* tail = Arena_new_region(arena, region_size);
     return Region_try_alloc(tail, size);
 }
 
@@ -130,23 +134,46 @@ void Arena_debug_print(Arena* arena) {
     }
 }
 
-Bytes Bytes_alloc(Arena* arena) {
-    constexpr size_t STARTING_CAPACITY = 128;
-
-    uint8_t* bytes = (uint8_t*)Arena_alloc(arena, STARTING_CAPACITY);
-    assert(bytes != nullptr);
-
-    return (Bytes){
-        .bytes = bytes,
-        .lenth = 0,
-        .capacity = STARTING_CAPACITY,
-    };
+ByteSlice ByteSlice_new(uint8_t* data, size_t length) {
+    return (ByteSlice){.data = data, .length = length};
 }
 
-Bytes Bytes_from_slice(BytesSlice slice) { assert(false); }
+// AnyBuffer Buffer_from_slice(ByteSlice slice, Arena* arena) {
+//     AnyBuffer buf = (AnyBuffer){
+//         .data = Arena_alloc(arena, slice.length),
+//         .size = slice.length,
+//         .capacity = slice.length,
+//     };
+//     assert(buf.data != nullptr);
 
-void Bytes_push(Bytes* self, uint8_t byte) {
-    // if (self->lenth == ) {}
-    assert(false);
+//     memcpy(buf.data, slice.start, buf.size);
+
+//     return buf;
+// }
+
+ByteSlice Buffer_as_bytes(AnyBuffer* self) {
+    return (ByteSlice){.data = self->data, .length = self->length};
 }
-uint8_t Bytes_pop(Bytes* self) { assert(false); }
+
+void Buffer_grow(AnyBuffer* buffer, Arena* arena, size_t by) {
+    if (buffer->length + by <= buffer->capacity) {
+        return;
+    }
+    if (buffer->capacity == 0) {
+        constexpr size_t STARTING_CAPACITY = 128;
+        buffer->capacity = STARTING_CAPACITY;
+
+        buffer->data = Arena_alloc(arena, buffer->capacity);
+        assert(buffer->data != nullptr);
+
+        return;
+    } else {
+        buffer->capacity *= 2;
+    }
+
+    uint8_t* new_bytes = Arena_alloc(arena, buffer->capacity);
+    assert(new_bytes != nullptr);
+
+    memcpy(new_bytes, buffer->data, buffer->length);
+    buffer->data = new_bytes;
+}

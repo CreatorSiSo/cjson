@@ -18,18 +18,44 @@ void Arena_destroy(Arena* arena);
 void Arena_debug_print(Arena* arena);
 
 typedef struct {
-    uint8_t* start;
+    void* data;
     size_t length;
-} BytesSlice;
+} AnySlice;
 
 typedef struct {
-    uint8_t* bytes;
-    size_t lenth;
+    uint8_t* data;
+    size_t length;
+} ByteSlice;
+
+ByteSlice ByteSlice_new(uint8_t* data, size_t length);
+
+typedef struct {
+    void* data;
+    size_t length;
     size_t capacity;
-} Bytes;
+} AnyBuffer;
 
-Bytes Bytes_init(void);
-Bytes Bytes_from_slice(BytesSlice slice);
+typedef struct {
+    uint8_t* data;
+    size_t length;
+    size_t capacity;
+} ByteBuffer;
 
-void Bytes_push(Bytes* self, uint8_t byte);
-uint8_t Bytes_pop(Bytes* self);
+// AnyBuffer Buffer_from_slice(ByteSlice slice, Arena* arena);
+
+#define Buffer_new() {.data = nullptr, .length = 0, .capacity = 0}
+#define Buffer_cast(buffer, buffer_type) (*(buffer_type*)&(buffer))
+
+ByteSlice Buffer_as_bytes(AnyBuffer* self);
+
+void Buffer_grow(AnyBuffer* data, Arena* arena, size_t by);
+
+#define Buffer_push(buffer, arena, element)                      \
+    Buffer_grow((AnyBuffer*)(buffer), (arena), sizeof(element)); \
+    (buffer)->data[(buffer)->length] = element;                  \
+    (buffer)->length += 1;
+
+// #define Buffer_pop(buffer)      \
+//     assert((buffer)->size > 0); \
+//     (buffer)->size -= 1;        \
+//     (buffer)->data[buffer->size];
